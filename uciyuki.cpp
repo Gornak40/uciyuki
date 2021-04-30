@@ -1,13 +1,19 @@
 #include <iostream>
 #include <sstream>
 #include <cstring>
+#include <numeric>
+#include <chrono>
+#include <algorithm>
+#include <random>
 
 using namespace std;
 
+mt19937 rng(chrono::steady_clock::now().time_since_epoch().count());
 const int INF = 1e9;
 const int N = 4;
+const int N2 = 16;
 int board = 0;
-int cache[1 << 16];
+int cache[1 << N2];
 
 
 inline int get_color() {
@@ -45,19 +51,22 @@ int negamax(int color, int alpha, int beta, bool is_root, int &nodes, int &bestm
 	++nodes;
 	if (is_game_over()) return cache[board] = 100 - __builtin_popcount(board);
 	int cp = -INF;
-	for (int row = 0; row < N; ++row) {
-		for (int col = 0; col < N; ++col) {
-			if (get_cell(row, col)) continue;
-			set_cell(row, col);
-			int cur = -negamax(-color, -beta, -alpha, false, nodes, bestmove);
-			set_cell(row, col);
-			if (cur > cp) {
-				cp = cur;
-				if (is_root) bestmove = (row << 2) | col;
-			}
-			alpha = max(alpha, cur);
-		//	if (alpha >= beta) break;
+	int order[N2];
+	iota(order, order + N2, 0);
+	shuffle(order, order + N2, rng);
+	for (int i = 0; i < N2; ++i) {
+		int mask = order[i];
+		int row = mask >> 2, col = mask & 3;
+		if (get_cell(row, col)) continue;
+		set_cell(row, col);
+		int cur = -negamax(-color, -beta, -alpha, false, nodes, bestmove);
+		set_cell(row, col);
+		if (cur > cp) {
+			cp = cur;
+			if (is_root) bestmove = (row << 2) | col;
 		}
+		alpha = max(alpha, cur);
+	//	if (alpha >= beta) break;
 	}
 	return cache[board] = cp;
 }

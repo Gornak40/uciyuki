@@ -1,10 +1,18 @@
 #include <iostream>
 #include <sstream>
+#include <cstring>
 
 using namespace std;
 
-int board = 0;
+const int INF = 1e9;
 const int N = 4;
+int board = 0;
+int cache[1 << 16];
+
+
+inline int get_color() {
+	return ((__builtin_popcount(board) & 1) ? -1 : 1);
+}
 
 inline int get_cell(int row, int col) {
 	return (board >> ((row << 2) | col)) & 1;
@@ -15,21 +23,43 @@ inline void set_cell(int row, int col) {
 }
 
 inline bool is_game_over() {
+	return (
+		// rows
+		(get_cell(0, 0) + get_cell(0, 1) + get_cell(0, 2) + get_cell(0, 3) == N) || 
+		(get_cell(1, 0) + get_cell(1, 1) + get_cell(1, 2) + get_cell(1, 3) == N) || 
+		(get_cell(2, 0) + get_cell(2, 1) + get_cell(2, 2) + get_cell(2, 3) == N) || 
+		(get_cell(3, 0) + get_cell(3, 1) + get_cell(3, 2) + get_cell(3, 3) == N) || 
+		// cols
+		(get_cell(0, 0) + get_cell(1, 0) + get_cell(2, 0) + get_cell(3, 0) == N) || 
+		(get_cell(0, 1) + get_cell(1, 1) + get_cell(2, 1) + get_cell(3, 1) == N) || 
+		(get_cell(0, 2) + get_cell(1, 2) + get_cell(2, 2) + get_cell(3, 2) == N) || 
+		(get_cell(0, 3) + get_cell(1, 3) + get_cell(2, 3) + get_cell(3, 3) == N) || 
+		// diags
+		(get_cell(0, 0) + get_cell(1, 1) + get_cell(2, 2) + get_cell(3, 3) == N) || 
+		(get_cell(0, 3) + get_cell(1, 2) + get_cell(2, 1) + get_cell(3, 0) == N)
+	);
+}
+
+int negamax(int color, int alpha, int beta, bool is_root, int &nodes, int &bestmove) {
+	if (!is_root && cache[board]) return cache[board];
+	++nodes;
+	if (is_game_over()) return cache[board] = 100 - __builtin_popcount(board);
+	int cp = -INF;
 	for (int row = 0; row < N; ++row) {
-		int row_sum = 0, col_sum = 0;
 		for (int col = 0; col < N; ++col) {
-			row_sum += get_cell(row, col);
-			col_sum += get_cell(col, row);
+			if (get_cell(row, col)) continue;
+			set_cell(row, col);
+			int cur = -negamax(-color, -beta, -alpha, false, nodes, bestmove);
+			set_cell(row, col);
+			if (cur > cp) {
+				cp = cur;
+				if (is_root) bestmove = (row << 2) | col;
+			}
+			alpha = max(alpha, cur);
+		//	if (alpha >= beta) break;
 		}
-		if (row_sum == N || col_sum == N)
-			return true;
 	}
-	int main_diag = 0, rev_diag = 0;
-	for (int row = 0; row < N; ++row) {
-		main_diag += get_cell(row, row);
-		rev_diag += get_cell(row, N - row - 1);
-	}
-	return (main_diag == N || rev_diag == N);
+	return cache[board] = cp;
 }
 
 void display() {
@@ -39,6 +69,7 @@ void display() {
 		}
 		cout << endl;
 	}
+	cout << "is game over: " << is_game_over() << endl;
 }
 
 namespace UCI {
@@ -54,6 +85,7 @@ namespace UCI {
 
 	void ucinewgame() {
 		board = 0;
+		memset(cache, 0, sizeof(cache));
 	}
 
 	void position() {
@@ -69,8 +101,13 @@ namespace UCI {
 	}
 
 	void go() {
-		string times;
-		getline(cin, times);
+		int color = get_color(), nodes = 0, bestmove;
+		int cp = negamax(color, -INF, INF, true, nodes, bestmove) * color;
+		cout << "info nodes " << nodes << endl;
+		cout << "info score cp " << cp << endl;
+		int row = bestmove >> 2;
+		int col = bestmove & 3;
+		cout << "bestmove " << ++row << ++col << endl;
 	}
 
 	void setoption() {
@@ -80,6 +117,7 @@ namespace UCI {
 
 	void start() {
 		cout << "UCIYuki by Gornak40" << endl;
+		ucinewgame();
 		for (string command; cin >> command;) {
 			if (command == "uci") {
 				uci();
